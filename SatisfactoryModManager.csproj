@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>SatisfactoryModManager</AssemblyName>
+    <RootNamespace>SatisfactoryModManager</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <AssemblyVersion>0.5.3.0</AssemblyVersion>
+    <FileVersion>0.5.3.0</FileVersion>
+    <InformationalVersion>0.5.3</InformationalVersion>
+    <!-- Alvos de publicação suportados de fato: apenas Windows, porque o app usa
+         Windows Forms (UseWindowsForms), que não existe fora do Windows.
+         "linux-x64" não é incluído aqui de propósito: adicioná-lo faria o
+         "dotnet publish -r linux-x64" falhar ou gerar um binário que não
+         inicia. Veja o README para o motivo e alternativas (Wine, ou uma
+         reescrita futura em um framework multiplataforma como Avalonia). -->
+    <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
+  </PropertyGroup>
+</Project>
