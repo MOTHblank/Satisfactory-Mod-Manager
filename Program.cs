@@ -231,9 +231,11 @@ public sealed class MainForm : Form
     private Label _activeCountChip = new Label();
     private Label _logHeader = new Label();
     private Label _titleLabel = new Label();
-    private readonly List<Panel> _cardPanels = new List<Panel>();
+    private readonly List<ModernCardPanel> _cardPanels = new List<ModernCardPanel>();
     private readonly List<Label> _chipLabels = new List<Label>();
     private readonly List<Label> _sectionLabels = new List<Label>();
+    private ModernBackgroundPanel _backdrop = new ModernBackgroundPanel();
+    private UiPalette _palette = UiTheme.Create(true);
     private ProgressBar _progress = new ProgressBar();
     private CancellationTokenSource? _ipcCts;
 
@@ -254,7 +256,14 @@ public sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         Icon = SystemIcons.Application;
         AllowDrop = true;
-        try { Font = new Font("Segoe UI", 9.5f, FontStyle.Regular); } catch { /* mantém a fonte padrão do sistema */ }
+        try
+        {
+            Font = new Font("Segoe UI Variable Text", 9.5f, FontStyle.Regular);
+        }
+        catch
+        {
+            try { Font = new Font("Segoe UI", 9.5f, FontStyle.Regular); } catch { /* mantém a fonte padrão do sistema */ }
+        }
 
         Directory.CreateDirectory(_dataRoot);
         Directory.CreateDirectory(BackupRoot);
@@ -278,23 +287,26 @@ public sealed class MainForm : Form
 
     private void BuildUi()
     {
+        _backdrop = new ModernBackgroundPanel();
+        Controls.Add(_backdrop);
+
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 6,
-            Padding = new Padding(14),
+            Padding = new Padding(18),
             BackColor = Color.Transparent
         };
 
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 104));  // cabeçalho + botão jogar
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));   // cartões de ações
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));   // chips de resumo
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));   // lista de mods
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 130));  // log
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));   // barra de status
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 118));  // identidade + localização do jogo
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 142));  // ações em cartões assimétricos
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));   // resumo
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));   // biblioteca de mods
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 118));  // atividade
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));   // estado
         root.Margin = new Padding(0);
-        Controls.Add(root);
+        _backdrop.Controls.Add(root);
 
         // ---------------------------------------------------------------
         // Cabeçalho: título/pasta do jogo à esquerda, botão "Jogar" grande à direita.
@@ -325,10 +337,10 @@ public sealed class MainForm : Form
 
         var title = new Label
         {
-            Text = $"🛠  SATISFACTORY MOD MANAGER  ·  v{AppVersion}",
+            Text = $"SATISFACTORY  /  MOD MANAGER     v{AppVersion}",
             AutoSize = false,
             Dock = DockStyle.Fill,
-            Font = new Font(Font.FontFamily, 10.5f, FontStyle.Bold),
+            Font = new Font(Font.FontFamily, 11.5f, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleLeft
         };
         _titleLabel = title;
@@ -427,31 +439,39 @@ public sealed class MainForm : Form
             RowCount = 1,
             Margin = new Padding(0, 8, 0, 0)
         };
-        cardsRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48));
-        cardsRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52));
+        cardsRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56));
+        cardsRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44));
 
         var modsCard = CardPanel();
-        var modsCardLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(12, 8, 12, 8), Margin = new Padding(0) };
-        modsCardLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 18));
+        var modsCardLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(14, 10, 14, 10), Margin = new Padding(0) };
+        modsCardLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
         modsCardLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var modsCardTitle = SectionLabel("MODS");
         modsCardLayout.Controls.Add(modsCardTitle, 0, 0);
-        var modActions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = false, Margin = new Padding(0) };
-        modActions.Controls.Add(Btn("＋ Adicionar mod", (_, _) => AddMod(), ButtonKind.Secondary));
-        modActions.Controls.Add(Btn("＋ Adicionar pasta", (_, _) => AddFolderMod(), ButtonKind.Secondary));
+        var modActions = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoScroll = false,
+            WrapContents = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0),
+            Padding = new Padding(0, 5, 0, 0)
+        };
+        modActions.Controls.Add(Btn("＋  Adicionar mod", (_, _) => AddMod(), ButtonKind.Secondary));
+        modActions.Controls.Add(Btn("＋  Adicionar pasta", (_, _) => AddFolderMod(), ButtonKind.Secondary));
         _enableButton = Btn("Ativar", (_, _) => EnableSelected(), ButtonKind.Secondary);
         _disableButton = Btn("Desativar", (_, _) => DisableSelected(), ButtonKind.Secondary);
         _removeButton = Btn("Remover", (_, _) => RemoveSelected(), ButtonKind.Danger);
-        _checkUpdateButton = Btn("🔄 Verificar atualização", (_, _) => CheckSelectedModUpdate(), ButtonKind.Secondary);
-        _openPageButton = Btn("🌐 Página do mod", (_, _) => OpenSelectedModPage(), ButtonKind.Secondary);
+        _checkUpdateButton = Btn("Verificar atualização", (_, _) => CheckSelectedModUpdate(), ButtonKind.Secondary);
+        _openPageButton = Btn("Página do mod", (_, _) => OpenSelectedModPage(), ButtonKind.Secondary);
         modActions.Controls.Add(_enableButton);
         modActions.Controls.Add(_disableButton);
         modActions.Controls.Add(_removeButton);
         modActions.Controls.Add(_checkUpdateButton);
         modActions.Controls.Add(_openPageButton);
-        var checkAllUpdatesButton = Btn("🔄 Verificar todas atualizações", (_, _) => CheckAllModsForUpdates(), ButtonKind.Secondary);
+        var checkAllUpdatesButton = Btn("Verificar todas", (_, _) => CheckAllModsForUpdates(), ButtonKind.Secondary);
         modActions.Controls.Add(checkAllUpdatesButton);
-        modActions.Controls.Add(Btn("↻ Atualizar lista", (_, _) => RefreshMods(), ButtonKind.Secondary));
+        modActions.Controls.Add(Btn("↻  Atualizar lista", (_, _) => RefreshMods(), ButtonKind.Secondary));
         tips.SetToolTip(_checkUpdateButton, "Consulta a SMR (ficsit.app) pela versão mais recente publicada do mod selecionado e compara com a versão instalada.");
         tips.SetToolTip(_openPageButton, "Abre a página do mod selecionado no ficsit.app, de onde também dá para baixar manualmente.");
         tips.SetToolTip(checkAllUpdatesButton, "Verifica, um por um, se há uma versão mais nova publicada de cada mod cadastrado.");
@@ -460,22 +480,30 @@ public sealed class MainForm : Form
         cardsRow.Controls.Add(modsCard, 0, 0);
 
         var gameCard = CardPanel();
-        var gameCardLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(12, 8, 12, 8), Margin = new Padding(0) };
-        gameCardLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 18));
+        var gameCardLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(14, 10, 14, 10), Margin = new Padding(0) };
+        gameCardLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
         gameCardLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var gameCardTitle = SectionLabel("JOGO E UTILITÁRIOS");
         gameCardLayout.Controls.Add(gameCardTitle, 0, 0);
-        var gameActions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = false, Margin = new Padding(0) };
+        var gameActions = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoScroll = false,
+            WrapContents = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0),
+            Padding = new Padding(0, 5, 0, 0)
+        };
         var pickExeButton = Btn("Selecionar executável...", (_, _) => PickGameExe(), ButtonKind.Secondary);
         var autoExeButton = Btn("Auto", (_, _) => UseAutoGameExe(), ButtonKind.Secondary);
         gameActions.Controls.Add(pickExeButton);
         gameActions.Controls.Add(autoExeButton);
         tips.SetToolTip(pickExeButton, "Escolha manualmente qual .exe deve ser usado para iniciar o jogo (útil se a detecção automática abrir o executável errado).");
         tips.SetToolTip(autoExeButton, "Remove a escolha manual de executável e volta a usar detecção automática/Steam.");
-        gameActions.Controls.Add(Btn("📁 Abrir Mods", (_, _) => OpenModsFolder(), ButtonKind.Secondary));
-        gameActions.Controls.Add(Btn("📁 Abrir dados", (_, _) => OpenDataFolder(), ButtonKind.Secondary));
-        gameActions.Controls.Add(Btn("🔗 Registrar ficsit.app", (_, _) => RegisterFicsitProtocol(), ButtonKind.Secondary));
-        _themeButton = Btn(_settings.DarkMode ? "☀ Modo claro" : "🌙 Modo escuro", (_, _) => ToggleTheme(), ButtonKind.Secondary);
+        gameActions.Controls.Add(Btn("Abrir Mods", (_, _) => OpenModsFolder(), ButtonKind.Secondary));
+        gameActions.Controls.Add(Btn("Abrir dados", (_, _) => OpenDataFolder(), ButtonKind.Secondary));
+        gameActions.Controls.Add(Btn("Registrar ficsit.app", (_, _) => RegisterFicsitProtocol(), ButtonKind.Secondary));
+        _themeButton = Btn(_settings.DarkMode ? "Modo claro" : "Modo escuro", (_, _) => ToggleTheme(), ButtonKind.Secondary);
         gameActions.Controls.Add(_themeButton);
 
         _preferSteamCheck = new CheckBox
@@ -562,7 +590,7 @@ public sealed class MainForm : Form
         // sob o cursor já esteja selecionado quando o menu abre.
         var modsMenu = new ContextMenuStrip();
         modsMenu.Items.Add(new ToolStripMenuItem("🌐 Abrir página do mod no ficsit.app", null, (_, _) => OpenSelectedModPage()));
-        modsMenu.Items.Add(new ToolStripMenuItem("🔄 Verificar atualização deste mod", null, (_, _) => CheckSelectedModUpdate()));
+        modsMenu.Items.Add(new ToolStripMenuItem("Verificar atualização deste mod", null, (_, _) => CheckSelectedModUpdate()));
         modsMenu.Opening += (_, e) => e.Cancel = SelectedMod() == null;
         _mods.ContextMenuStrip = modsMenu;
         // A ListView não expõe DoubleBuffered publicamente, mas como usamos OwnerDraw
@@ -638,11 +666,14 @@ public sealed class MainForm : Form
 
     private enum ButtonKind { Secondary, Accent, Danger }
 
-    /// <summary>Cria um painel "cartão" com cantos arredondados, usado para agrupar seções da UI.</summary>
-    private Panel CardPanel()
+    /// <summary>Cria uma superfície elevada com borda, luz ambiente e spotlight sutil.</summary>
+    private ModernCardPanel CardPanel()
     {
-        var panel = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 0) };
-        panel.SizeChanged += (_, _) => ApplyRoundedRegion(panel, 10);
+        var panel = new ModernCardPanel
+        {
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0)
+        };
         _cardPanels.Add(panel);
         return panel;
     }
@@ -684,7 +715,7 @@ public sealed class MainForm : Form
             return;
 
         var dark = _settings.DarkMode;
-        var muted = dark ? Color.FromArgb(140, 146, 152) : Color.FromArgb(140, 144, 148);
+        var muted = _palette.Muted;
         const int headerHeight = 24;
         var area = new Rectangle(16, headerHeight + 16, Math.Max(0, _mods.Width - 32), Math.Max(0, _mods.Height - headerHeight - 32));
 
@@ -695,7 +726,7 @@ public sealed class MainForm : Form
 
     private Button Btn(string text, EventHandler onClick, ButtonKind kind = ButtonKind.Secondary)
     {
-        var button = new Button
+        var button = new ModernButton
         {
             Text = text,
             AutoSize = true,
@@ -703,12 +734,15 @@ public sealed class MainForm : Form
             Margin = new Padding(4, 3, 4, 3),
             Padding = new Padding(14, 0, 14, 0),
             Cursor = Cursors.Hand,
-            UseVisualStyleBackColor = false,
-            Tag = kind
+            Tag = kind,
+            Tone = kind switch
+            {
+                ButtonKind.Accent => ModernButtonTone.Accent,
+                ButtonKind.Danger => ModernButtonTone.Danger,
+                _ => ModernButtonTone.Secondary
+            }
         };
         button.Click += onClick;
-        button.SizeChanged += (_, _) => ApplyRoundedRegion(button, 8);
-        ApplyRoundedRegion(button, 8);
         return button;
     }
 
@@ -742,77 +776,39 @@ public sealed class MainForm : Form
     private void ApplyTheme()
     {
         var dark = _settings.DarkMode;
-        var background = dark ? Color.FromArgb(24, 26, 29) : Color.FromArgb(238, 240, 242);
-        var surface = dark ? Color.FromArgb(40, 43, 47) : Color.White;
-        var surfaceAlt = dark ? Color.FromArgb(33, 36, 39) : Color.FromArgb(250, 250, 250);
-        var cardBack = dark ? Color.FromArgb(35, 38, 42) : Color.White;
-        var foreground = dark ? Color.FromArgb(235, 237, 240) : Color.FromArgb(32, 33, 36);
-        var muted = dark ? Color.FromArgb(160, 167, 174) : Color.FromArgb(105, 110, 116);
-        var border = dark ? Color.FromArgb(60, 64, 69) : Color.FromArgb(210, 213, 217);
-        var accent = dark ? Color.FromArgb(232, 141, 40) : Color.FromArgb(214, 122, 30);
-        var accentBorder = dark ? Color.FromArgb(255, 165, 70) : Color.FromArgb(180, 100, 20);
-        var accentHover = dark ? Color.FromArgb(244, 156, 58) : Color.FromArgb(224, 135, 45);
-        var accentPressed = dark ? Color.FromArgb(202, 118, 28) : Color.FromArgb(190, 105, 20);
-        var danger = dark ? Color.FromArgb(198, 82, 74) : Color.FromArgb(178, 58, 50);
-        var chipBack = dark ? Color.FromArgb(52, 56, 61) : Color.FromArgb(226, 229, 233);
-        var chipText = dark ? Color.FromArgb(220, 224, 228) : Color.FromArgb(50, 53, 57);
+        _palette = UiTheme.Create(dark);
 
-        BackColor = background;
-        ForeColor = foreground;
+        BackColor = _palette.BackgroundBase;
+        ForeColor = _palette.Foreground;
+        _backdrop.SetPalette(_palette);
 
         void Apply(Control control)
         {
-            control.ForeColor = foreground;
-            control.BackColor = background;
+            control.ForeColor = _palette.Foreground;
 
             switch (control)
             {
-                case Button button:
-                    var kind = button.Tag as ButtonKind? ?? ButtonKind.Secondary;
-                    button.FlatStyle = FlatStyle.Flat;
-                    button.FlatAppearance.BorderColor = kind switch
-                    {
-                        ButtonKind.Accent => accentBorder,
-                        ButtonKind.Danger => danger,
-                        _ => border
-                    };
-                    button.BackColor = kind switch
-                    {
-                        ButtonKind.Accent => accent,
-                        ButtonKind.Danger => surface,
-                        _ => surface
-                    };
-                    button.ForeColor = kind switch
-                    {
-                        ButtonKind.Accent => Color.White,
-                        ButtonKind.Danger => danger,
-                        _ => foreground
-                    };
-                    button.FlatAppearance.MouseOverBackColor = kind switch
-                    {
-                        ButtonKind.Accent => accentHover,
-                        ButtonKind.Danger => dark ? Color.FromArgb(60, 40, 40) : Color.FromArgb(250, 232, 230),
-                        _ => dark ? Color.FromArgb(52, 57, 62) : Color.FromArgb(230, 233, 237)
-                    };
-                    button.FlatAppearance.MouseDownBackColor = kind switch
-                    {
-                        ButtonKind.Accent => accentPressed,
-                        ButtonKind.Danger => dark ? Color.FromArgb(70, 46, 46) : Color.FromArgb(244, 220, 217),
-                        _ => dark ? Color.FromArgb(62, 67, 73) : Color.FromArgb(218, 222, 227)
-                    };
+                case ModernBackgroundPanel backdrop:
+                    backdrop.SetPalette(_palette);
+                    break;
+                case ModernCardPanel card:
+                    card.SetPalette(_palette);
+                    break;
+                case ModernButton button:
+                    button.SetPalette(_palette);
                     break;
                 case TextBox textBox:
-                    textBox.BackColor = surfaceAlt;
-                    textBox.ForeColor = foreground;
+                    textBox.BackColor = _palette.BackgroundElevated;
+                    textBox.ForeColor = _palette.Foreground;
                     textBox.BorderStyle = BorderStyle.FixedSingle;
                     break;
                 case CheckBox checkBox:
                     checkBox.BackColor = Color.Transparent;
-                    checkBox.ForeColor = muted;
+                    checkBox.ForeColor = _palette.Muted;
                     break;
                 case Label label:
                     label.BackColor = Color.Transparent;
-                    label.ForeColor = muted;
+                    label.ForeColor = _palette.Muted;
                     break;
                 case TableLayoutPanel or FlowLayoutPanel:
                     control.BackColor = Color.Transparent;
@@ -826,60 +822,51 @@ public sealed class MainForm : Form
         foreach (Control control in Controls)
             Apply(control);
 
-        // Cartões: fundo "surface", levemente destacado do fundo da janela.
         foreach (var card in _cardPanels)
-        {
-            card.BackColor = cardBack;
-            foreach (Control child in card.Controls)
-                Apply(child);
-        }
+            card.SetPalette(_palette);
 
-        // Chips de resumo: pílulas com fundo neutro.
         foreach (var chip in _chipLabels)
         {
-            chip.BackColor = chipBack;
-            chip.ForeColor = chipText;
+            chip.BackColor = UiTheme.Blend(_palette.SurfaceRaised, _palette.Accent, dark ? 0.09f : 0.05f);
+            chip.ForeColor = dark ? _palette.Subtle : _palette.Foreground;
         }
 
-        // Títulos de seção (dentro dos cartões, log): texto mudo, discreto.
         foreach (var section in _sectionLabels)
-            section.ForeColor = muted;
+            section.ForeColor = _palette.Muted;
 
-        // Título principal do cabeçalho: usa a cor de destaque (laranja), como uma logo.
-        _titleLabel.ForeColor = accent;
+        _titleLabel.ForeColor = UiTheme.Blend(_palette.Foreground, _palette.Accent, dark ? 0.22f : 0.36f);
 
-        _mods.BackColor = surfaceAlt;
-        _mods.ForeColor = foreground;
-        _mods.BorderStyle = BorderStyle.FixedSingle;
+        _mods.BackColor = _palette.Surface;
+        _mods.ForeColor = _palette.Foreground;
+        _mods.BorderStyle = BorderStyle.None;
         _mods.OwnerDraw = true;
         _mods.Invalidate();
-        _log.BackColor = dark ? Color.FromArgb(18, 20, 22) : Color.White;
-        _log.ForeColor = dark ? Color.FromArgb(210, 214, 218) : foreground;
-        _status.ForeColor = muted;
+
+        _log.BackColor = _palette.BackgroundElevated;
+        _log.ForeColor = dark ? Color.FromArgb(205, 208, 216) : _palette.Foreground;
+        _log.BorderStyle = BorderStyle.None;
+        _status.ForeColor = _palette.Muted;
 
         ApplyWindowChromeTheme(dark);
 
-        _themeButton.Text = dark ? "☀ Modo claro" : "🌙 Modo escuro";
+        _themeButton.Text = dark ? "Modo claro" : "Modo escuro";
 
-        // Recalcula texto/cor do status do jogo e os chips de contagem para o tema atual.
         UpdateGameStatus();
         RefreshMods();
     }
 
     private void Mods_DrawColumnHeader(object? sender, DrawListViewColumnHeaderEventArgs e)
     {
-        var dark = _settings.DarkMode;
-        var headerBack = dark ? Color.FromArgb(49, 53, 58) : Color.FromArgb(236, 238, 241);
-        var headerText = dark ? Color.FromArgb(238, 240, 243) : Color.FromArgb(35, 37, 40);
-        var border = dark ? Color.FromArgb(74, 79, 85) : Color.FromArgb(205, 208, 212);
+        var headerBack = _palette.BackgroundElevated;
+        var headerText = _palette.Subtle;
+        var border = _palette.Border;
 
         using var backBrush = new SolidBrush(headerBack);
-        using var textBrush = new SolidBrush(headerText);
         using var pen = new Pen(border);
         e.Graphics.FillRectangle(backBrush, e.Bounds);
         e.Graphics.DrawLine(pen, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
 
-        var textBounds = Rectangle.Inflate(e.Bounds, -8, 0);
+        var textBounds = Rectangle.Inflate(e.Bounds, -10, 0);
         var flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
         TextRenderer.DrawText(e.Graphics, e.Header?.Text ?? string.Empty, Font, textBounds, headerText, flags);
     }
@@ -894,33 +881,22 @@ public sealed class MainForm : Form
 
     private void Mods_DrawSubItem(object? sender, DrawListViewSubItemEventArgs e)
     {
-        var dark = _settings.DarkMode;
         var selected = e.Item?.Selected ?? false;
         var alternate = (e.Item?.Index ?? 0) % 2 == 1;
-        var rowBack = dark
-            ? (alternate ? Color.FromArgb(38, 42, 46) : Color.FromArgb(33, 36, 39))
-            : (alternate ? Color.FromArgb(250, 250, 250) : Color.White);
-
-        var background = selected
-            ? (dark ? Color.FromArgb(70, 60, 45) : Color.FromArgb(250, 232, 210))
-            : rowBack;
-        var foreground = selected
-            ? (dark ? Color.White : Color.FromArgb(35, 37, 40))
-            : (dark ? Color.FromArgb(225, 228, 232) : Color.FromArgb(35, 37, 40));
+        var rowBack = alternate ? _palette.SurfaceRaised : _palette.Surface;
+        var background = selected ? _palette.Selection : rowBack;
+        var foreground = selected ? _palette.Foreground : UiTheme.Blend(_palette.Foreground, _palette.Muted, 0.08f);
 
         using var backBrush = new SolidBrush(background);
         e.Graphics.FillRectangle(backBrush, e.Bounds);
 
-        // Coluna 0 (Status): desenha um "badge" em pílula em vez de texto simples.
         if (e.ColumnIndex == 0)
         {
             var active = string.Equals(e.Item?.Text, "ATIVO", StringComparison.OrdinalIgnoreCase);
             var pillBack = active
-                ? (dark ? Color.FromArgb(40, 74, 52) : Color.FromArgb(214, 240, 222))
-                : (dark ? Color.FromArgb(58, 61, 65) : Color.FromArgb(226, 228, 231));
-            var pillText = active
-                ? (dark ? Color.FromArgb(123, 221, 164) : Color.FromArgb(24, 125, 72))
-                : (dark ? Color.FromArgb(180, 185, 190) : Color.FromArgb(100, 104, 108));
+                ? UiTheme.Blend(_palette.SurfaceRaised, _palette.Success, 0.22f)
+                : UiTheme.Blend(_palette.SurfaceRaised, _palette.Muted, 0.12f);
+            var pillText = active ? _palette.Success : _palette.Muted;
 
             var pillRect = Rectangle.Inflate(e.Bounds, -10, -6);
             if (pillRect.Width > 0 && pillRect.Height > 0)
@@ -930,14 +906,6 @@ public sealed class MainForm : Form
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 e.Graphics.FillPath(pillBrush, pillPath);
 
-                // Nota: TextRenderer.DrawText usa o rasterizador de texto do GDI, que por
-                // padrão aplica ClearType. O ClearType assume texto escrito sobre um fundo
-                // neutro (preto/branco) e faz o "blending" de subpixel com base nisso; em
-                // cima de um fundo saturado (verde/cinza da pílula) o resultado é a franja
-                // de cor fantasma sobreposta ao texto ("ATIVO" com um "eco" verde-oliva por
-                // trás) que aparecia nesta coluna. Usar Graphics.DrawString (GDI+) com
-                // anti-aliasing normal resolve isso, porque o GDI+ mistura o texto com a cor
-                // que já está pintada atrás dele em vez de presumir um fundo neutro.
                 var previousHint = e.Graphics.TextRenderingHint;
                 e.Graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
                 using var pillTextBrush = new SolidBrush(pillText);
@@ -954,26 +922,23 @@ public sealed class MainForm : Form
             return;
         }
 
-        // Coluna "Atualização": mesmo texto simples das demais colunas, mas colorido
-        // conforme o resultado da última verificação (verde = tem atualização, âmbar =
-        // não foi possível verificar), reaproveitando as cores já usadas na pílula ATIVO.
         if (e.ColumnIndex == 3)
         {
             var mod = e.Item?.Tag as ModRecord;
             var info = mod != null && _updateCache.TryGetValue(mod.Id, out var cached) ? cached : null;
             var updateColor = foreground;
             if (info?.Error != null)
-                updateColor = dark ? Color.FromArgb(214, 172, 108) : Color.FromArgb(150, 100, 20);
+                updateColor = _palette.Warning;
             else if (info?.UpdateAvailable == true)
-                updateColor = dark ? Color.FromArgb(123, 221, 164) : Color.FromArgb(24, 125, 72);
+                updateColor = _palette.Success;
 
-            var updateBounds = Rectangle.Inflate(e.Bounds, -8, 0);
+            var updateBounds = Rectangle.Inflate(e.Bounds, -10, 0);
             var updateFlags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
             TextRenderer.DrawText(e.Graphics, e.SubItem?.Text ?? string.Empty, Font, updateBounds, updateColor, updateFlags);
             return;
         }
 
-        var bounds = Rectangle.Inflate(e.Bounds, -8, 0);
+        var bounds = Rectangle.Inflate(e.Bounds, -10, 0);
         var textFlags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
         TextRenderer.DrawText(e.Graphics, e.SubItem?.Text ?? string.Empty, Font, bounds, foreground, textFlags);
     }
@@ -1569,12 +1534,11 @@ public sealed class MainForm : Form
     private void SetGameStatus(string text, StatusSeverity severity)
     {
         _gameStatus.Text = text;
-        var dark = _settings.DarkMode;
         _gameStatus.ForeColor = severity switch
         {
-            StatusSeverity.Success => dark ? Color.FromArgb(123, 221, 164) : Color.FromArgb(24, 125, 72),
-            StatusSeverity.Warning => dark ? Color.FromArgb(240, 196, 120) : Color.FromArgb(156, 97, 8),
-            _ => dark ? Color.FromArgb(175, 181, 188) : Color.FromArgb(90, 95, 100)
+            StatusSeverity.Success => _palette.Success,
+            StatusSeverity.Warning => _palette.Warning,
+            _ => _palette.Muted
         };
     }
 
