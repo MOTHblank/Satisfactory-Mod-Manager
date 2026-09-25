@@ -8,6 +8,14 @@
 
 ---
 
+# Implementation status
+
+The first implementation pass is now applied in the application code: library-first layout, search/filtering, contextual mod actions, collapsed activity log, advanced settings moved out of the main workspace, direct update actions, explicit SML setup, quieter visual effects, responsive primary columns, improved setup recovery, and CI build verification.
+
+The remaining unchecked items in this audit should be treated as follow-up refinement rather than blockers for the structural redesign.
+
+---
+
 # Executive diagnosis
 
 The recent visual work improved surface polish, but the product is still organized like a developer control panel.
