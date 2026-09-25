@@ -80,6 +80,21 @@ internal static class Program
         }
     }
 
+    internal static bool IsProtocolHandlerRegistered()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(@"Software\Classes\" + ProtocolScheme + @"\shell\open\command");
+            var command = key?.GetValue("") as string;
+            return !string.IsNullOrWhiteSpace(command) &&
+                   command.Contains(GetApplicationPath(), StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static void UnregisterProtocolHandler()
     {
         try
@@ -267,6 +282,7 @@ public sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         Icon = SystemIcons.Application;
         AllowDrop = true;
+        KeyPreview = true;
         try
         {
             Font = new Font("Segoe UI Variable Text", 9.5f, FontStyle.Regular);
@@ -289,6 +305,7 @@ public sealed class MainForm : Form
 
         DragEnter += MainForm_DragEnter;
         DragDrop += MainForm_DragDrop;
+        KeyDown += MainForm_KeyDown;
         FormClosing += (_, _) =>
         {
             _ipcCts?.Cancel();
@@ -529,6 +546,7 @@ public sealed class MainForm : Form
         _mods.DrawSubItem += Mods_DrawSubItem;
         _mods.Paint += Mods_PaintEmptyState;
         _mods.MouseUp += Mods_MouseUp;
+        _mods.Resize += (_, _) => ResizeModColumns();
         EnableDoubleBuffering(_mods);
 
         var modsMenu = new ContextMenuStrip();
@@ -1102,12 +1120,8 @@ public sealed class MainForm : Form
             RefreshMods();
             SaveState();
 
-            MessageBox.Show(
-                this,
-                $"Mod instalado com sucesso.\n\nMod: {downloaded.Name}\nVersão: {downloaded.Version}",
-                "ficsit.app",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+            _status.Text = $"{downloaded.Name} {downloaded.Version} instalado com sucesso.";
+            Log($"Instalado via ficsit.app: {downloaded.Name} {downloaded.Version}");
 
             try { File.Delete(downloaded.FilePath); } catch { }
 
@@ -1119,7 +1133,7 @@ public sealed class MainForm : Form
             Log("Falha na instalação via ficsit.app: " + ex.Message);
             MessageBox.Show(
                 this,
-                "Não foi possível concluir a instalação automática.\n\n" + ex.Message + "\n\nA solicitação foi recebida corretamente; você pode baixar o pacote no ficsit.app e usar Adicionar mod/arrastar e soltar.",
+                "Não foi possível concluir a instalação automática.\n\n" + ex.Message + "\n\nA solicitação foi recebida corretamente; você pode baixar o pacote no ficsit.app e usar Instalar arquivo ou arrastar e soltar.",
                 "ficsit.app",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
@@ -1220,11 +1234,7 @@ public sealed class MainForm : Form
                 row.Selected = true;
         }
 
-        if (_mods.Columns.Count >= 4)
-        {
-            var available = Math.Max(260, _mods.ClientSize.Width - _mods.Columns[0].Width - _mods.Columns[2].Width - _mods.Columns[3].Width - 8);
-            _mods.Columns[1].Width = available;
-        }
+        ResizeModColumns();
 
         var active = _db.Mods.Count(m => m.Enabled);
         var updates = _db.Mods.Count(m => _updateCache.TryGetValue(m.Id, out var info) && info.UpdateAvailable);
@@ -1263,6 +1273,46 @@ public sealed class MainForm : Form
         if (info.UpdateAvailable)
             return string.IsNullOrWhiteSpace(info.LatestVersion) ? "Atualização disponível" : $"Atualizar para {info.LatestVersion}";
         return "Em dia";
+    }
+
+    private void ResizeModColumns()
+    {
+        if (_mods.Columns.Count < 4 || _mods.ClientSize.Width <= 0)
+            return;
+
+        var fixedWidth = _mods.Columns[0].Width + _mods.Columns[2].Width + _mods.Columns[3].Width;
+        _mods.Columns[1].Width = Math.Max(240, _mods.ClientSize.Width - fixedWidth - 6);
+    }
+
+    private void MainForm_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Control && e.KeyCode == Keys.F)
+        {
+            _searchBox.Focus();
+            _searchBox.SelectAll();
+            e.SuppressKeyPress = true;
+            return;
+        }
+
+        if (e.Control && e.KeyCode == Keys.O)
+        {
+            AddMod();
+            e.SuppressKeyPress = true;
+            return;
+        }
+
+        if (e.KeyCode == Keys.F5)
+        {
+            CheckAllModsForUpdates();
+            e.SuppressKeyPress = true;
+            return;
+        }
+
+        if (e.KeyCode == Keys.Delete && SelectedMod() != null && !_searchBox.Focused)
+        {
+            RemoveSelected();
+            e.SuppressKeyPress = true;
+        }
     }
 
     private void Mods_MouseUp(object? sender, MouseEventArgs e)
@@ -1345,8 +1395,8 @@ public sealed class MainForm : Form
 
     /// <summary>
     /// Consulta a SMR pela versão mais recente do mod e guarda o resultado no cache em
-    /// memória (mostrado na coluna "Atualização"). Não baixa nem instala nada — apenas
-    /// informa. O usuário decide se quer atualizar manualmente pela página do mod.
+    /// memória (mostrado na coluna "Atualização"). A atualização pode ser aplicada
+    /// diretamente pelo comando contextual quando o pacote é resolvido pela SMR.
     /// </summary>
     private async Task CheckModUpdateAsync(ModRecord mod, bool announceUpToDate)
     {
@@ -1359,7 +1409,7 @@ public sealed class MainForm : Form
             if (info.Error != null)
                 Log($"Não foi possível verificar atualização de '{mod.Name}': {info.Error}");
             else if (info.UpdateAvailable)
-                Log($"Atualização disponível para '{mod.Name}': {FormatVersion(mod.Version)} → v{info.LatestVersion}. Use \"Página do mod\" para baixar.");
+                Log($"Atualização disponível para '{mod.Name}': {FormatVersion(mod.Version)} → v{info.LatestVersion}.");
             else if (announceUpToDate)
                 Log($"'{mod.Name}' já está na versão mais recente publicada ({info.LatestVersion ?? mod.Version}).");
         }
@@ -1390,12 +1440,24 @@ public sealed class MainForm : Form
         var root = _gamePath.Text.Trim().Trim('"');
         if (!IsGameRoot(root))
         {
-            MessageBox.Show(this,
-                "Selecione a pasta raiz do Satisfactory (a pasta que contém FactoryGame).",
-                "Pasta do jogo",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
-            return false;
+            AutoDetectGame(false);
+            root = _gamePath.Text.Trim().Trim('"');
+        }
+
+        if (!IsGameRoot(root))
+        {
+            var answer = MessageBox.Show(this,
+                "O Satisfactory ainda não foi detectado. Deseja escolher a pasta de instalação agora?",
+                "Satisfactory não detectado",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Information);
+
+            if (answer == DialogResult.Yes)
+                PickGameRoot();
+
+            root = _gamePath.Text.Trim().Trim('"');
+            if (!IsGameRoot(root))
+                return false;
         }
 
         _settings.GameRoot = Path.GetFullPath(root);
@@ -1639,7 +1701,8 @@ public sealed class MainForm : Form
             ColumnCount = 1,
             RowCount = 7,
             Padding = new Padding(18),
-            BackColor = _palette.BackgroundBase
+            BackColor = _palette.BackgroundBase,
+            AutoScroll = true
         };
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
@@ -1687,7 +1750,21 @@ public sealed class MainForm : Form
         layout.Controls.Add(exeRow);
 
         var integrationRow = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, BackColor = _palette.BackgroundBase };
-        integrationRow.Controls.Add(Btn("Reparar integração ficsit.app", (_, _) => RegisterFicsitProtocol(), ButtonKind.Secondary));
+        var integrationStatus = new Label
+        {
+            Text = Program.IsProtocolHandlerRegistered() ? "ficsit.app: conectado" : "ficsit.app: precisa de reparo",
+            AutoSize = true,
+            Margin = new Padding(0, 10, 12, 0),
+            ForeColor = Program.IsProtocolHandlerRegistered() ? _palette.Success : _palette.Warning
+        };
+        integrationRow.Controls.Add(integrationStatus);
+        integrationRow.Controls.Add(Btn("Reparar integração", (_, _) =>
+        {
+            RegisterFicsitProtocol();
+            var connected = Program.IsProtocolHandlerRegistered();
+            integrationStatus.Text = connected ? "ficsit.app: conectado" : "ficsit.app: precisa de reparo";
+            integrationStatus.ForeColor = connected ? _palette.Success : _palette.Warning;
+        }, ButtonKind.Secondary));
         integrationRow.Controls.Add(Btn("Abrir dados do app", (_, _) => OpenDataFolder(), ButtonKind.Secondary));
         layout.Controls.Add(integrationRow);
 
@@ -1709,7 +1786,7 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             AutoSize = false,
-            Text = $"Versão {AppVersion}\\nConfigurações avançadas ficam aqui para manter a biblioteca focada no uso normal.",
+            Text = $"Versão {AppVersion}\nConfigurações avançadas ficam aqui para manter a biblioteca focada no uso normal.",
             ForeColor = _palette.Muted
         };
         layout.Controls.Add(note);
