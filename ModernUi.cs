@@ -131,6 +131,12 @@ internal sealed class ModernBackgroundPanel : Panel
 
     protected override void OnPaintBackground(PaintEventArgs e)
     {
+        if (Width <= 0 || Height <= 0)
+        {
+            base.OnPaintBackground(e);
+            return;
+        }
+
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
@@ -194,9 +200,41 @@ internal sealed class ModernCardPanel : Panel
                  ControlStyles.ResizeRedraw |
                  ControlStyles.UserPaint |
                  ControlStyles.SupportsTransparentBackColor, true);
-        MouseEnter += (_, _) => { _hot = true; Invalidate(); };
-        MouseLeave += (_, _) => { _hot = false; Invalidate(); };
-        MouseMove += (_, e) => { _pointer = e.Location; if (_hot) Invalidate(); };
+        MouseEnter += (_, _) => UpdatePointer(PointToClient(Cursor.Position));
+        MouseLeave += (_, _) => UpdatePointer(PointToClient(Cursor.Position));
+        MouseMove += (_, e) => UpdatePointer(e.Location);
+        ControlAdded += (_, e) => TrackPointerFrom(e.Control);
+    }
+
+    private void TrackPointerFrom(Control control)
+    {
+        control.MouseEnter += ChildPointerChanged;
+        control.MouseLeave += ChildPointerChanged;
+        control.MouseMove += ChildPointerMoved;
+        control.ControlAdded += (_, e) => TrackPointerFrom(e.Control);
+
+        foreach (Control child in control.Controls)
+            TrackPointerFrom(child);
+    }
+
+    private void ChildPointerChanged(object? sender, EventArgs e)
+    {
+        UpdatePointer(PointToClient(Cursor.Position));
+    }
+
+    private void ChildPointerMoved(object? sender, MouseEventArgs e)
+    {
+        if (sender is not Control child)
+            return;
+
+        UpdatePointer(PointToClient(child.PointToScreen(e.Location)));
+    }
+
+    private void UpdatePointer(Point location)
+    {
+        _pointer = location;
+        _hot = ClientRectangle.Contains(location);
+        Invalidate();
     }
 
     internal void SetPalette(UiPalette palette)
