@@ -112,7 +112,7 @@ internal sealed class ModernBackgroundPanel : Panel
         };
 
         // Use the Windows UI-animation preference as a conservative reduced-motion signal.
-        if (SystemInformation.MenuAnimation)
+        if (SystemInformation.IsMenuAnimationEnabled)
             _motionTimer.Start();
     }
 
@@ -203,7 +203,11 @@ internal sealed class ModernCardPanel : Panel
         MouseEnter += (_, _) => UpdatePointer(PointToClient(Cursor.Position));
         MouseLeave += (_, _) => UpdatePointer(PointToClient(Cursor.Position));
         MouseMove += (_, e) => UpdatePointer(e.Location);
-        ControlAdded += (_, e) => TrackPointerFrom(e.Control);
+        ControlAdded += (_, e) =>
+        {
+            if (e.Control is { } child)
+                TrackPointerFrom(child);
+        };
     }
 
     private void TrackPointerFrom(Control control)
@@ -211,7 +215,11 @@ internal sealed class ModernCardPanel : Panel
         control.MouseEnter += ChildPointerChanged;
         control.MouseLeave += ChildPointerChanged;
         control.MouseMove += ChildPointerMoved;
-        control.ControlAdded += (_, e) => TrackPointerFrom(e.Control);
+        control.ControlAdded += (_, e) =>
+        {
+            if (e.Control is { } child)
+                TrackPointerFrom(child);
+        };
 
         foreach (Control child in control.Controls)
             TrackPointerFrom(child);
