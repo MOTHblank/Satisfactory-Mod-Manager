@@ -90,9 +90,6 @@ internal static class UiTheme
 internal sealed class ModernBackgroundPanel : Panel
 {
     private UiPalette _palette = UiTheme.Create(true);
-    private readonly System.Windows.Forms.Timer _motionTimer;
-    private float _phase;
-
     internal ModernBackgroundPanel()
     {
         DoubleBuffered = true;
@@ -101,32 +98,12 @@ internal sealed class ModernBackgroundPanel : Panel
                  ControlStyles.OptimizedDoubleBuffer |
                  ControlStyles.ResizeRedraw |
                  ControlStyles.UserPaint, true);
-
-        _motionTimer = new System.Windows.Forms.Timer { Interval = 70 };
-        _motionTimer.Tick += (_, _) =>
-        {
-            _phase += 0.018f;
-            if (_phase > MathF.PI * 2f)
-                _phase -= MathF.PI * 2f;
-            Invalidate();
-        };
-
-        // Use the Windows UI-animation preference as a conservative reduced-motion signal.
-        if (SystemInformation.IsMenuAnimationEnabled)
-            _motionTimer.Start();
     }
 
     internal void SetPalette(UiPalette palette)
     {
         _palette = palette;
         Invalidate();
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-            _motionTimer.Dispose();
-        base.Dispose(disposing);
     }
 
     protected override void OnPaintBackground(PaintEventArgs e)
@@ -137,51 +114,12 @@ internal sealed class ModernBackgroundPanel : Panel
             return;
         }
 
-        var g = e.Graphics;
-        g.SmoothingMode = SmoothingMode.AntiAlias;
-
-        using (var background = new LinearGradientBrush(
-                   ClientRectangle,
-                   _palette.BackgroundElevated,
-                   _palette.BackgroundDeep,
-                   LinearGradientMode.Vertical))
-        {
-            g.FillRectangle(background, ClientRectangle);
-        }
-
-        var driftX = (int)(MathF.Sin(_phase) * 34f);
-        var driftY = (int)(MathF.Cos(_phase * 0.72f) * 22f);
-        DrawGlow(g,
-            new Rectangle(Width / 2 - 520 + driftX, -330 + driftY, 1040, 720),
-            Color.FromArgb(54, _palette.Accent));
-        DrawGlow(g,
-            new Rectangle(-330 - driftX / 2, Height / 4 - 170, 720, 620),
-            Color.FromArgb(24, 113, 87, 195));
-        DrawGlow(g,
-            new Rectangle(Width - 430 + driftX / 3, Height / 3, 620, 560),
-            Color.FromArgb(20, 73, 118, 210));
-
-        using var gridPen = new Pen(Color.FromArgb(10, _palette.Foreground), 1f);
-        const int grid = 64;
-        for (var x = 0; x < Width; x += grid)
-            g.DrawLine(gridPen, x, 0, x, Height);
-        for (var y = 0; y < Height; y += grid)
-            g.DrawLine(gridPen, 0, y, Width, y);
-    }
-
-    private static void DrawGlow(Graphics g, Rectangle bounds, Color centerColor)
-    {
-        if (bounds.Width <= 0 || bounds.Height <= 0)
-            return;
-
-        using var path = new GraphicsPath();
-        path.AddEllipse(bounds);
-        using var brush = new PathGradientBrush(path)
-        {
-            CenterColor = centerColor,
-            SurroundColors = new[] { Color.FromArgb(0, centerColor) }
-        };
-        g.FillEllipse(brush, bounds);
+        using var background = new LinearGradientBrush(
+            ClientRectangle,
+            _palette.BackgroundElevated,
+            _palette.BackgroundDeep,
+            LinearGradientMode.Vertical);
+        e.Graphics.FillRectangle(background, ClientRectangle);
     }
 }
 
@@ -189,7 +127,6 @@ internal sealed class ModernCardPanel : Panel
 {
     private UiPalette _palette = UiTheme.Create(true);
     private bool _hot;
-    private Point _pointer;
 
     internal ModernCardPanel()
     {
@@ -200,49 +137,8 @@ internal sealed class ModernCardPanel : Panel
                  ControlStyles.ResizeRedraw |
                  ControlStyles.UserPaint |
                  ControlStyles.SupportsTransparentBackColor, true);
-        MouseEnter += (_, _) => UpdatePointer(PointToClient(Cursor.Position));
-        MouseLeave += (_, _) => UpdatePointer(PointToClient(Cursor.Position));
-        MouseMove += (_, e) => UpdatePointer(e.Location);
-        ControlAdded += (_, e) =>
-        {
-            if (e.Control is { } child)
-                TrackPointerFrom(child);
-        };
-    }
-
-    private void TrackPointerFrom(Control control)
-    {
-        control.MouseEnter += ChildPointerChanged;
-        control.MouseLeave += ChildPointerChanged;
-        control.MouseMove += ChildPointerMoved;
-        control.ControlAdded += (_, e) =>
-        {
-            if (e.Control is { } child)
-                TrackPointerFrom(child);
-        };
-
-        foreach (Control child in control.Controls)
-            TrackPointerFrom(child);
-    }
-
-    private void ChildPointerChanged(object? sender, EventArgs e)
-    {
-        UpdatePointer(PointToClient(Cursor.Position));
-    }
-
-    private void ChildPointerMoved(object? sender, MouseEventArgs e)
-    {
-        if (sender is not Control child)
-            return;
-
-        UpdatePointer(PointToClient(child.PointToScreen(e.Location)));
-    }
-
-    private void UpdatePointer(Point location)
-    {
-        _pointer = location;
-        _hot = ClientRectangle.Contains(location);
-        Invalidate();
+        MouseEnter += (_, _) => { _hot = true; Invalidate(); };
+        MouseLeave += (_, _) => { _hot = false; Invalidate(); };
     }
 
     internal void SetPalette(UiPalette palette)
@@ -275,19 +171,6 @@ internal sealed class ModernCardPanel : Panel
                    LinearGradientMode.Vertical))
         {
             g.FillPath(fill, path);
-        }
-
-        if (_hot)
-        {
-            var glowBounds = new Rectangle(_pointer.X - 170, _pointer.Y - 170, 340, 340);
-            using var glowPath = new GraphicsPath();
-            glowPath.AddEllipse(glowBounds);
-            using var glow = new PathGradientBrush(glowPath)
-            {
-                CenterColor = Color.FromArgb(32, _palette.Accent),
-                SurroundColors = new[] { Color.FromArgb(0, _palette.Accent) }
-            };
-            g.FillEllipse(glow, glowBounds);
         }
 
         using var border = new Pen(_hot ? _palette.BorderHover : _palette.Border);
