@@ -234,7 +234,7 @@ public sealed class MainForm : Form
     private readonly List<ModernCardPanel> _cardPanels = new List<ModernCardPanel>();
     private readonly List<Label> _chipLabels = new List<Label>();
     private readonly List<Label> _sectionLabels = new List<Label>();
-    private ModernBackgroundPanel _backdrop = new ModernBackgroundPanel();
+    private ModernBackgroundPanel _backdrop = null!;
     private UiPalette _palette = UiTheme.Create(true);
     private ProgressBar _progress = new ProgressBar();
     private CancellationTokenSource? _ipcCts;
@@ -714,7 +714,6 @@ public sealed class MainForm : Form
         if (_mods.Items.Count > 0)
             return;
 
-        var dark = _settings.DarkMode;
         var muted = _palette.Muted;
         const int headerHeight = 24;
         var area = new Rectangle(16, headerHeight + 16, Math.Max(0, _mods.Width - 32), Math.Max(0, _mods.Height - headerHeight - 32));
