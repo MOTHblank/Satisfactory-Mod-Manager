@@ -231,6 +231,16 @@ public sealed class MainForm : Form
     private Label _activeCountChip = new Label();
     private Label _logHeader = new Label();
     private Label _titleLabel = new Label();
+    private Label _gameLocationLabel = new Label();
+    private Label _smlStatusLabel = new Label();
+    private TextBox _searchBox = new TextBox();
+    private ComboBox _filterBox = new ComboBox();
+    private Button _updateButton = new Button();
+    private Button _installSmlButton = new Button();
+    private FlowLayoutPanel _selectedActionsPanel = new FlowLayoutPanel();
+    private TableLayoutPanel _rootLayout = new TableLayoutPanel();
+    private Control? _activityPanel;
+    private bool _activityExpanded;
     private readonly List<ModernCardPanel> _cardPanels = new List<ModernCardPanel>();
     private readonly List<Label> _chipLabels = new List<Label>();
     private readonly List<Label> _sectionLabels = new List<Label>();
@@ -290,268 +300,201 @@ public sealed class MainForm : Form
         _backdrop = new ModernBackgroundPanel();
         Controls.Add(_backdrop);
 
-        var root = new TableLayoutPanel
+        _rootLayout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 6,
             Padding = new Padding(18),
-            BackColor = Color.Transparent
+            BackColor = Color.Transparent,
+            Margin = new Padding(0)
         };
+        _rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 116));
+        _rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
+        _rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        _rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        _rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
+        _rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+        _backdrop.Controls.Add(_rootLayout);
 
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 118));  // identidade + localização do jogo
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 142));  // ações em cartões assimétricos
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));   // resumo
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));   // biblioteca de mods
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 118));  // atividade
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));   // estado
-        root.Margin = new Padding(0);
-        _backdrop.Controls.Add(root);
+        var tips = new ToolTip { AutoPopDelay = 8000, InitialDelay = 400, ReshowDelay = 200 };
 
-        // ---------------------------------------------------------------
-        // Cabeçalho: título/pasta do jogo à esquerda, botão "Jogar" grande à direita.
-        // ---------------------------------------------------------------
         var header = CardPanel();
         var headerLayout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 2,
+            ColumnCount = 3,
             RowCount = 1,
-            Margin = new Padding(0),
-            Padding = new Padding(14, 10, 14, 10)
+            Padding = new Padding(16, 12, 14, 12),
+            Margin = new Padding(0)
         };
+        headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 235));
         headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210));
+        headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 310));
         header.Controls.Add(headerLayout);
 
-        var infoStack = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 3,
-            Margin = new Padding(0)
-        };
-        infoStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
-        infoStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
-        infoStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 20));
-
-        var title = new Label
-        {
-            Text = $"SATISFACTORY  /  MOD MANAGER     v{AppVersion}",
-            AutoSize = false,
-            Dock = DockStyle.Fill,
-            Font = new Font(Font.FontFamily, 11.5f, FontStyle.Bold),
-            TextAlign = ContentAlignment.MiddleLeft
-        };
-        _titleLabel = title;
-        infoStack.Controls.Add(title, 0, 0);
-
-        var pathRow = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 4,
-            RowCount = 1,
-            Margin = new Padding(0)
-        };
-        pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 88));
-        pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96));
-        pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96));
-
-        var pathLabel = new Label
-        {
-            Text = "Pasta do jogo",
-            Anchor = AnchorStyles.Left,
-            AutoSize = true,
-            Margin = new Padding(0, 8, 4, 0)
-        };
-        pathRow.Controls.Add(pathLabel, 0, 0);
-
-        _gamePath = new TextBox
-        {
-            Dock = DockStyle.Fill,
-            Text = _settings.GameRoot ?? string.Empty,
-            AllowDrop = true,
-            Margin = new Padding(0, 3, 6, 3)
-        };
-        pathRow.Controls.Add(_gamePath, 1, 0);
-
-        var browse = Btn("Procurar...", (_, _) => PickGameRoot(), ButtonKind.Secondary);
-        pathRow.Controls.Add(browse, 2, 0);
-
-        var detect = Btn("Detectar", (_, _) => AutoDetectGame(true), ButtonKind.Secondary);
-        pathRow.Controls.Add(detect, 3, 0);
-        infoStack.Controls.Add(pathRow, 0, 1);
-
-        _gameStatus = new Label
-        {
-            Text = "Jogo não definido",
-            Dock = DockStyle.Fill,
-            AutoEllipsis = true,
-            Padding = new Padding(90, 0, 0, 0)
-        };
-        infoStack.Controls.Add(_gameStatus, 0, 2);
-        headerLayout.Controls.Add(infoStack, 0, 0);
-
-        var launchStack = new TableLayoutPanel
+        var brand = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 2,
-            Margin = new Padding(12, 0, 0, 0)
+            Margin = new Padding(0)
         };
-        launchStack.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        launchStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
+        brand.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+        brand.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-        _launchButton = Btn("▶   JOGAR", (_, _) => LaunchGame(), ButtonKind.Accent);
-        _launchButton.Dock = DockStyle.Fill;
-        _launchButton.Font = new Font(Font.FontFamily, 11f, FontStyle.Bold);
-        launchStack.Controls.Add(_launchButton, 0, 0);
-
-        _launchAfterInstall = new CheckBox
+        _titleLabel = new Label
         {
-            Text = "Iniciar após instalar",
-            AutoSize = true,
-            Anchor = AnchorStyles.Right,
-            Checked = _settings.LaunchAfterInstall,
-            Margin = new Padding(0, 4, 0, 0)
+            Text = "Satisfactory Mod Manager",
+            Dock = DockStyle.Fill,
+            Font = new Font(Font.FontFamily, 13f, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft
         };
-        _launchAfterInstall.CheckedChanged += (_, _) =>
+        brand.Controls.Add(_titleLabel, 0, 0);
+
+        var brandSub = new Label
         {
-            _settings.LaunchAfterInstall = _launchAfterInstall.Checked;
-            SaveState();
+            Text = "Mods locais + integração com ficsit.app",
+            Dock = DockStyle.Fill,
+            AutoEllipsis = true,
+            TextAlign = ContentAlignment.TopLeft
         };
-        launchStack.Controls.Add(_launchAfterInstall, 0, 1);
-        headerLayout.Controls.Add(launchStack, 1, 0);
+        brand.Controls.Add(brandSub, 0, 1);
+        headerLayout.Controls.Add(brand, 0, 0);
 
-        var tips = new ToolTip { AutoPopDelay = 8000, InitialDelay = 400, ReshowDelay = 200 };
-        tips.SetToolTip(_launchButton, "Inicia o jogo com os mods ativos atuais. Usa Steam quando possível para evitar erros de inicialização.");
+        var readiness = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+            Margin = new Padding(12, 0, 12, 0)
+        };
+        readiness.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        readiness.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
+        readiness.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
 
-        root.Controls.Add(header, 0, 0);
+        _gameStatus = new Label
+        {
+            Text = "Satisfactory não detectado",
+            Dock = DockStyle.Fill,
+            AutoEllipsis = true,
+            Font = new Font(Font.FontFamily, 9.5f, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        readiness.Controls.Add(_gameStatus, 0, 0);
 
-        // ---------------------------------------------------------------
-        // Dois cartões lado a lado: ações de mods e ações do jogo/app.
-        // ---------------------------------------------------------------
-        var cardsRow = new TableLayoutPanel
+        _gameLocationLabel = new Label
+        {
+            Dock = DockStyle.Fill,
+            AutoEllipsis = true,
+            Text = "Detecte a instalação para começar.",
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        readiness.Controls.Add(_gameLocationLabel, 0, 1);
+
+        _smlStatusLabel = new Label
+        {
+            Dock = DockStyle.Fill,
+            AutoEllipsis = true,
+            Text = "SML: status indisponível",
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        readiness.Controls.Add(_smlStatusLabel, 0, 2);
+        headerLayout.Controls.Add(readiness, 1, 0);
+
+        var headerActions = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
+            RowCount = 2,
+            Margin = new Padding(0)
+        };
+        headerActions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        headerActions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        headerActions.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+        headerActions.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+
+        var detect = Btn("Detectar jogo", (_, _) => AutoDetectGame(true), ButtonKind.Secondary);
+        detect.Dock = DockStyle.Fill;
+        detect.AutoSize = false;
+        headerActions.Controls.Add(detect, 0, 0);
+
+        var changeGame = Btn("Alterar pasta", (_, _) => PickGameRoot(), ButtonKind.Secondary);
+        changeGame.Dock = DockStyle.Fill;
+        changeGame.AutoSize = false;
+        headerActions.Controls.Add(changeGame, 1, 0);
+
+        var settings = Btn("Configurações", (_, _) => ShowSettingsDialog(), ButtonKind.Secondary);
+        settings.Dock = DockStyle.Fill;
+        settings.AutoSize = false;
+        headerActions.Controls.Add(settings, 0, 1);
+
+        _launchButton = Btn("JOGAR", (_, _) => LaunchGame(), ButtonKind.Accent);
+        _launchButton.Dock = DockStyle.Fill;
+        _launchButton.AutoSize = false;
+        _launchButton.Font = new Font(Font.FontFamily, 10.5f, FontStyle.Bold);
+        headerActions.Controls.Add(_launchButton, 1, 1);
+        tips.SetToolTip(_launchButton, "Inicia o Satisfactory com a configuração atual. Se o SML estiver ausente, o app pedirá para instalá-lo primeiro.");
+        headerLayout.Controls.Add(headerActions, 2, 0);
+
+        _gamePath = new TextBox
+        {
+            Text = _settings.GameRoot ?? string.Empty,
+            Visible = false
+        };
+        header.Controls.Add(_gamePath);
+        _rootLayout.Controls.Add(header, 0, 0);
+
+        var commandRow = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 5,
             RowCount = 1,
-            Margin = new Padding(0, 8, 0, 0)
+            Margin = new Padding(0, 8, 0, 6)
         };
-        cardsRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56));
-        cardsRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44));
+        commandRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        commandRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 145));
+        commandRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 145));
+        commandRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 118));
+        commandRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
 
-        var modsCard = CardPanel();
-        var modsCardLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(14, 10, 14, 10), Margin = new Padding(0) };
-        modsCardLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
-        modsCardLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        var modsCardTitle = SectionLabel("MODS");
-        modsCardLayout.Controls.Add(modsCardTitle, 0, 0);
-        var modActions = new FlowLayoutPanel
+        _searchBox = new TextBox
         {
             Dock = DockStyle.Fill,
-            AutoScroll = false,
-            WrapContents = true,
-            FlowDirection = FlowDirection.LeftToRight,
-            Margin = new Padding(0),
-            Padding = new Padding(0, 5, 0, 0)
+            PlaceholderText = "Pesquisar mods instalados...",
+            Margin = new Padding(0, 4, 8, 4)
         };
-        modActions.Controls.Add(Btn("＋  Adicionar mod", (_, _) => AddMod(), ButtonKind.Secondary));
-        modActions.Controls.Add(Btn("＋  Adicionar pasta", (_, _) => AddFolderMod(), ButtonKind.Secondary));
-        _enableButton = Btn("Ativar", (_, _) => EnableSelected(), ButtonKind.Secondary);
-        _disableButton = Btn("Desativar", (_, _) => DisableSelected(), ButtonKind.Secondary);
-        _removeButton = Btn("Remover", (_, _) => RemoveSelected(), ButtonKind.Danger);
-        _checkUpdateButton = Btn("Verificar atualização", (_, _) => CheckSelectedModUpdate(), ButtonKind.Secondary);
-        _openPageButton = Btn("Página do mod", (_, _) => OpenSelectedModPage(), ButtonKind.Secondary);
-        modActions.Controls.Add(_enableButton);
-        modActions.Controls.Add(_disableButton);
-        modActions.Controls.Add(_removeButton);
-        modActions.Controls.Add(_checkUpdateButton);
-        modActions.Controls.Add(_openPageButton);
-        var checkAllUpdatesButton = Btn("Verificar todas", (_, _) => CheckAllModsForUpdates(), ButtonKind.Secondary);
-        modActions.Controls.Add(checkAllUpdatesButton);
-        modActions.Controls.Add(Btn("↻  Atualizar lista", (_, _) => RefreshMods(), ButtonKind.Secondary));
-        tips.SetToolTip(_checkUpdateButton, "Consulta a SMR (ficsit.app) pela versão mais recente publicada do mod selecionado e compara com a versão instalada.");
-        tips.SetToolTip(_openPageButton, "Abre a página do mod selecionado no ficsit.app, de onde também dá para baixar manualmente.");
-        tips.SetToolTip(checkAllUpdatesButton, "Verifica, um por um, se há uma versão mais nova publicada de cada mod cadastrado.");
-        modsCardLayout.Controls.Add(modActions, 0, 1);
-        modsCard.Controls.Add(modsCardLayout);
-        cardsRow.Controls.Add(modsCard, 0, 0);
+        _searchBox.TextChanged += (_, _) => RefreshMods();
+        commandRow.Controls.Add(_searchBox, 0, 0);
 
-        var gameCard = CardPanel();
-        var gameCardLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(14, 10, 14, 10), Margin = new Padding(0) };
-        gameCardLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
-        gameCardLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        var gameCardTitle = SectionLabel("JOGO E UTILITÁRIOS");
-        gameCardLayout.Controls.Add(gameCardTitle, 0, 0);
-        var gameActions = new FlowLayoutPanel
+        var browseMods = Btn("Explorar mods", (_, _) => BrowseMods(), ButtonKind.Accent);
+        browseMods.Dock = DockStyle.Fill;
+        browseMods.AutoSize = false;
+        commandRow.Controls.Add(browseMods, 1, 0);
+
+        var installFile = Btn("Instalar arquivo", (_, _) => AddMod(), ButtonKind.Secondary);
+        installFile.Dock = DockStyle.Fill;
+        installFile.AutoSize = false;
+        commandRow.Controls.Add(installFile, 2, 0);
+
+        _filterBox = new ComboBox
         {
             Dock = DockStyle.Fill,
-            AutoScroll = false,
-            WrapContents = true,
-            FlowDirection = FlowDirection.LeftToRight,
-            Margin = new Padding(0),
-            Padding = new Padding(0, 5, 0, 0)
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Margin = new Padding(4)
         };
-        var pickExeButton = Btn("Selecionar executável...", (_, _) => PickGameExe(), ButtonKind.Secondary);
-        var autoExeButton = Btn("Auto", (_, _) => UseAutoGameExe(), ButtonKind.Secondary);
-        gameActions.Controls.Add(pickExeButton);
-        gameActions.Controls.Add(autoExeButton);
-        tips.SetToolTip(pickExeButton, "Escolha manualmente qual .exe deve ser usado para iniciar o jogo (útil se a detecção automática abrir o executável errado).");
-        tips.SetToolTip(autoExeButton, "Remove a escolha manual de executável e volta a usar detecção automática/Steam.");
-        gameActions.Controls.Add(Btn("Abrir Mods", (_, _) => OpenModsFolder(), ButtonKind.Secondary));
-        gameActions.Controls.Add(Btn("Abrir dados", (_, _) => OpenDataFolder(), ButtonKind.Secondary));
-        gameActions.Controls.Add(Btn("Registrar ficsit.app", (_, _) => RegisterFicsitProtocol(), ButtonKind.Secondary));
-        _themeButton = Btn(_settings.DarkMode ? "Modo claro" : "Modo escuro", (_, _) => ToggleTheme(), ButtonKind.Secondary);
-        gameActions.Controls.Add(_themeButton);
+        _filterBox.Items.AddRange(new object[] { "Todos", "Ativos", "Desativados", "Atualizações" });
+        _filterBox.SelectedIndex = 0;
+        _filterBox.SelectedIndexChanged += (_, _) => RefreshMods();
+        commandRow.Controls.Add(_filterBox, 3, 0);
 
-        _preferSteamCheck = new CheckBox
-        {
-            Text = "Preferir iniciar via Steam",
-            AutoSize = true,
-            Checked = _settings.PreferSteamLaunch,
-            Margin = new Padding(12, 10, 0, 0)
-        };
-        _preferSteamCheck.CheckedChanged += (_, _) =>
-        {
-            _settings.PreferSteamLaunch = _preferSteamCheck.Checked;
-            SaveState();
-        };
-        gameActions.Controls.Add(_preferSteamCheck);
-        gameCardLayout.Controls.Add(gameActions, 0, 1);
-        gameCard.Controls.Add(gameCardLayout);
-        cardsRow.Controls.Add(gameCard, 1, 0);
-        root.Controls.Add(cardsRow, 0, 1);
+        var more = Btn("Mais", (_, _) => { }, ButtonKind.Secondary);
+        more.Dock = DockStyle.Fill;
+        more.AutoSize = false;
+        more.Click += (_, _) => ShowLibraryMenu(more);
+        commandRow.Controls.Add(more, 4, 0);
+        _rootLayout.Controls.Add(commandRow, 0, 1);
 
-        // ---------------------------------------------------------------
-        // Chips de resumo (contagem de mods) + dica de uso.
-        // ---------------------------------------------------------------
-        var chipsRow = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            WrapContents = false,
-            Margin = new Padding(0, 6, 0, 0)
-        };
-        _modsCountChip = ChipLabel("0 mods cadastrados");
-        _activeCountChip = ChipLabel("0 ativos");
-        chipsRow.Controls.Add(_modsCountChip);
-        chipsRow.Controls.Add(_activeCountChip);
-        var help = new Label
-        {
-            AutoSize = false,
-            Dock = DockStyle.Fill,
-            Text = "Arraste .zip/.smod ou uma pasta de mod para a janela  ·  ficsit.app: clique em Instalar e este gerenciador recebe a solicitação",
-            AutoEllipsis = true,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Margin = new Padding(10, 4, 0, 0)
-        };
-        chipsRow.Controls.Add(help);
-        root.Controls.Add(chipsRow, 0, 2);
-
-        // ---------------------------------------------------------------
-        // Lista de mods.
-        // ---------------------------------------------------------------
         _mods = new ListView
         {
             Dock = DockStyle.Fill,
@@ -563,59 +506,72 @@ public sealed class MainForm : Form
             UseCompatibleStateImageBehavior = false,
             BorderStyle = BorderStyle.FixedSingle
         };
-        // Truque clássico do WinForms: a ListView em modo Details usa a altura do
-        // SmallImageList (quando existe) para calcular a altura das linhas. Como
-        // pintamos tudo manualmente (OwnerDraw), nenhum ícone deste ImageList chega a
-        // ser desenhado — ele só existe para dar mais altura à linha, o que deixa a
-        // pílula de status com espaço confortável em vez de espremida.
-        _modsRowSpacer.Images.Add(new Bitmap(1, 28));
+        _modsRowSpacer.Images.Add(new Bitmap(1, 30));
         _mods.SmallImageList = _modsRowSpacer;
-        _mods.Columns.Add("Status", 96);
-        _mods.Columns.Add("Nome", 260);
-        _mods.Columns.Add("Versão", 110);
-        _mods.Columns.Add("Atualização", 190);
-        _mods.Columns.Add("Tipo", 170);
-        _mods.Columns.Add("Arquivos", 76);
-        _mods.Columns.Add("Origem", 420);
+        _mods.Columns.Add("Status", 118);
+        _mods.Columns.Add("Mod", 420);
+        _mods.Columns.Add("Versão", 130);
+        _mods.Columns.Add("Atualização", 230);
         _mods.SelectedIndexChanged += (_, _) => { UpdateButtons(); _mods.Invalidate(); };
-        _mods.DoubleClick += (_, _) => ToggleSelected();
         _mods.DrawColumnHeader += Mods_DrawColumnHeader;
         _mods.DrawItem += Mods_DrawItem;
         _mods.DrawSubItem += Mods_DrawSubItem;
         _mods.Paint += Mods_PaintEmptyState;
         _mods.MouseUp += Mods_MouseUp;
+        EnableDoubleBuffering(_mods);
 
-        // Menu de contexto (clique direito): ações rápidas para o mod sob o cursor, sem
-        // precisar sair do teclado/mouse na lista. Mods_MouseUp acima garante que o item
-        // sob o cursor já esteja selecionado quando o menu abre.
         var modsMenu = new ContextMenuStrip();
-        modsMenu.Items.Add(new ToolStripMenuItem("🌐 Abrir página do mod no ficsit.app", null, (_, _) => OpenSelectedModPage()));
-        modsMenu.Items.Add(new ToolStripMenuItem("Verificar atualização deste mod", null, (_, _) => CheckSelectedModUpdate()));
+        modsMenu.Items.Add(new ToolStripMenuItem("Ativar / desativar", null, (_, _) => ToggleSelected()));
+        modsMenu.Items.Add(new ToolStripMenuItem("Verificar atualização", null, (_, _) => CheckSelectedModUpdate()));
+        modsMenu.Items.Add(new ToolStripMenuItem("Abrir página no ficsit.app", null, (_, _) => OpenSelectedModPage()));
+        modsMenu.Items.Add(new ToolStripSeparator());
+        modsMenu.Items.Add(new ToolStripMenuItem("Desinstalar", null, (_, _) => RemoveSelected()));
         modsMenu.Opening += (_, e) => e.Cancel = SelectedMod() == null;
         _mods.ContextMenuStrip = modsMenu;
-        // A ListView não expõe DoubleBuffered publicamente, mas como usamos OwnerDraw
-        // (pintamos pílulas e texto nós mesmos célula a célula), sem isso o controle
-        // repinta direto na tela e uma atualização (troca de status, scroll, resize)
-        // pode ser capturada "pela metade", misturando o frame antigo com o novo —
-        // exatamente o tipo de texto sobreposto/borrado visto na coluna Status.
-        EnableDoubleBuffering(_mods);
-        root.Controls.Add(_mods, 0, 3);
+        _rootLayout.Controls.Add(_mods, 0, 2);
 
-        // ---------------------------------------------------------------
-        // Log de atividades, com cabeçalho estilo "console".
-        // ---------------------------------------------------------------
-        var logCard = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = new Padding(0, 6, 0, 0) };
-        logCard.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
-        logCard.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        _selectedActionsPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            AutoScroll = false,
+            Margin = new Padding(0, 5, 0, 3),
+            Visible = false
+        };
+        _enableButton = Btn("Ativar", (_, _) => EnableSelected(), ButtonKind.Secondary);
+        _disableButton = Btn("Desativar", (_, _) => DisableSelected(), ButtonKind.Secondary);
+        _updateButton = Btn("Atualizar", async (_, _) => await UpdateSelectedModAsync(), ButtonKind.Accent);
+        _checkUpdateButton = Btn("Verificar atualização", (_, _) => CheckSelectedModUpdate(), ButtonKind.Secondary);
+        _openPageButton = Btn("Abrir no ficsit.app", (_, _) => OpenSelectedModPage(), ButtonKind.Secondary);
+        _removeButton = Btn("Desinstalar", (_, _) => RemoveSelected(), ButtonKind.Danger);
+        _selectedActionsPanel.Controls.Add(_enableButton);
+        _selectedActionsPanel.Controls.Add(_disableButton);
+        _selectedActionsPanel.Controls.Add(_updateButton);
+        _selectedActionsPanel.Controls.Add(_checkUpdateButton);
+        _selectedActionsPanel.Controls.Add(_openPageButton);
+        _selectedActionsPanel.Controls.Add(_removeButton);
+        _rootLayout.Controls.Add(_selectedActionsPanel, 0, 3);
+
+        var activity = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = new Padding(0, 5, 0, 0),
+            Visible = false
+        };
+        activity.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
+        activity.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         _logHeader = new Label
         {
-            Text = "▾  REGISTRO DE ATIVIDADES",
+            Text = "ATIVIDADE",
             Dock = DockStyle.Fill,
             Font = new Font(Font.FontFamily, 8f, FontStyle.Bold),
             TextAlign = ContentAlignment.BottomLeft
         };
         _sectionLabels.Add(_logHeader);
-        logCard.Controls.Add(_logHeader, 0, 0);
+        activity.Controls.Add(_logHeader, 0, 0);
 
         _log = new TextBox
         {
@@ -627,20 +583,19 @@ public sealed class MainForm : Form
             BorderStyle = BorderStyle.FixedSingle,
             Margin = new Padding(0)
         };
-        logCard.Controls.Add(_log, 0, 1);
-        root.Controls.Add(logCard, 0, 4);
+        activity.Controls.Add(_log, 0, 1);
+        _activityPanel = activity;
+        _rootLayout.Controls.Add(activity, 0, 4);
 
-        // ---------------------------------------------------------------
-        // Barra de status inferior.
-        // ---------------------------------------------------------------
         var statusPanel = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 2,
+            ColumnCount = 3,
             RowCount = 1,
-            Margin = new Padding(0, 4, 0, 0)
+            Margin = new Padding(0, 3, 0, 0)
         };
         statusPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        statusPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
         statusPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
 
         _status = new Label
@@ -652,16 +607,24 @@ public sealed class MainForm : Form
         };
         statusPanel.Controls.Add(_status, 0, 0);
 
+        var activityButton = Btn("Atividade", (_, _) => ToggleActivity(), ButtonKind.Secondary);
+        activityButton.Dock = DockStyle.Fill;
+        activityButton.AutoSize = false;
+        activityButton.Margin = new Padding(3, 0, 3, 0);
+        statusPanel.Controls.Add(activityButton, 1, 0);
+
         _progress = new ProgressBar
         {
             Dock = DockStyle.Fill,
             Style = ProgressBarStyle.Marquee,
             MarqueeAnimationSpeed = 30,
             Visible = false,
-            Margin = new Padding(4, 3, 0, 3)
+            Margin = new Padding(4, 4, 0, 4)
         };
-        statusPanel.Controls.Add(_progress, 1, 0);
-        root.Controls.Add(statusPanel, 0, 5);
+        statusPanel.Controls.Add(_progress, 2, 0);
+        _rootLayout.Controls.Add(statusPanel, 0, 5);
+
+        UpdateButtons();
     }
 
     private enum ButtonKind { Secondary, Accent, Danger }
@@ -718,7 +681,7 @@ public sealed class MainForm : Form
         const int headerHeight = 24;
         var area = new Rectangle(16, headerHeight + 16, Math.Max(0, _mods.Width - 32), Math.Max(0, _mods.Height - headerHeight - 32));
 
-        const string message = "Nenhum mod instalado ainda.\r\nArraste um .zip/.smod aqui, use \"Adicionar mod\" ou clique em Install no ficsit.app.";
+        const string message = "Nenhum mod instalado.\r\nUse “Explorar mods” para abrir o ficsit.app ou “Instalar arquivo” para adicionar um pacote local.\r\nVocê também pode arrastar .zip/.smod para esta janela.";
         var flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.WordBreak;
         TextRenderer.DrawText(e.Graphics, message, Font, area, muted, flags);
     }
@@ -915,7 +878,7 @@ public sealed class MainForm : Form
                     Trimming = StringTrimming.None,
                     FormatFlags = StringFormatFlags.NoWrap
                 };
-                e.Graphics.DrawString(active ? "● ATIVO" : "○ OFF", Font, pillTextBrush, pillRect, pillFormat);
+                e.Graphics.DrawString(active ? "ATIVO" : "DESATIVADO", Font, pillTextBrush, pillRect, pillFormat);
                 e.Graphics.TextRenderingHint = previousHint;
             }
             return;
@@ -929,6 +892,8 @@ public sealed class MainForm : Form
             if (info?.Error != null)
                 updateColor = _palette.Warning;
             else if (info?.UpdateAvailable == true)
+                updateColor = _palette.Warning;
+            else if (info != null)
                 updateColor = _palette.Success;
 
             var updateBounds = Rectangle.Inflate(e.Bounds, -10, 0);
@@ -1211,26 +1176,50 @@ public sealed class MainForm : Form
 
     private void RefreshMods()
     {
+        var selectedId = SelectedMod()?.Id;
+        _mods.BeginUpdate();
         _mods.Items.Clear();
 
-        foreach (var mod in _db.Mods.OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase))
+        var query = _searchBox?.Text?.Trim() ?? string.Empty;
+        var filter = _filterBox?.SelectedItem?.ToString() ?? "Todos";
+
+        IEnumerable<ModRecord> mods = _db.Mods.OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(query))
+            mods = mods.Where(m => m.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                                   m.Id.Contains(query, StringComparison.OrdinalIgnoreCase));
+
+        mods = filter switch
         {
-            var row = new ListViewItem(mod.Enabled ? "ATIVO" : "OFF");
+            "Ativos" => mods.Where(m => m.Enabled),
+            "Desativados" => mods.Where(m => !m.Enabled),
+            "Atualizações" => mods.Where(m => _updateCache.TryGetValue(m.Id, out var info) && info.UpdateAvailable),
+            _ => mods
+        };
+
+        foreach (var mod in mods)
+        {
+            var row = new ListViewItem(mod.Enabled ? "ATIVO" : "DESATIVADO");
             row.SubItems.Add(mod.Name);
-            row.SubItems.Add(string.IsNullOrWhiteSpace(mod.Version) ? "-" : mod.Version);
+            row.SubItems.Add(string.IsNullOrWhiteSpace(mod.Version) ? "—" : mod.Version);
             row.SubItems.Add(FormatUpdateStatus(mod));
-            row.SubItems.Add(mod.Type);
-            row.SubItems.Add(mod.InstalledFiles.Count.ToString());
-            row.SubItems.Add(mod.Source);
             row.Tag = mod;
             _mods.Items.Add(row);
+
+            if (selectedId != null && mod.Id.Equals(selectedId, StringComparison.OrdinalIgnoreCase))
+                row.Selected = true;
         }
 
-        _status.Text = $"SMM {AppVersion}  |  Arraste arquivos para instalar";
-        if (_modsCountChip.Parent != null)
-            _modsCountChip.Text = $"🧩 {_db.Mods.Count} mods cadastrados";
-        if (_activeCountChip.Parent != null)
-            _activeCountChip.Text = $"✅ {_db.Mods.Count(m => m.Enabled)} ativos";
+        if (_mods.Columns.Count >= 4)
+        {
+            var available = Math.Max(260, _mods.ClientSize.Width - _mods.Columns[0].Width - _mods.Columns[2].Width - _mods.Columns[3].Width - 8);
+            _mods.Columns[1].Width = available;
+        }
+
+        var active = _db.Mods.Count(m => m.Enabled);
+        var updates = _db.Mods.Count(m => _updateCache.TryGetValue(m.Id, out var info) && info.UpdateAvailable);
+        _status.Text = $"{active} ativo(s) · {_db.Mods.Count} instalado(s)" + (updates > 0 ? $" · {updates} atualização(ões)" : string.Empty);
+        _mods.EndUpdate();
+        UpdateReadinessStatus();
         UpdateButtons();
         _mods.Invalidate();
     }
@@ -1238,23 +1227,29 @@ public sealed class MainForm : Form
     private void UpdateButtons()
     {
         var mod = SelectedMod();
-        _enableButton.Enabled = mod != null && !mod.Enabled;
-        _disableButton.Enabled = mod != null && mod.Enabled;
-        _removeButton.Enabled = mod != null;
-        _checkUpdateButton.Enabled = mod != null;
-        _openPageButton.Enabled = mod != null;
+        var hasSelection = mod != null;
+        _selectedActionsPanel.Visible = hasSelection;
+        _enableButton.Visible = hasSelection && !mod!.Enabled;
+        _disableButton.Visible = hasSelection && mod!.Enabled;
+        _removeButton.Visible = hasSelection;
+        _checkUpdateButton.Visible = hasSelection;
+        _openPageButton.Visible = hasSelection;
+        _updateButton.Visible = hasSelection &&
+            _updateCache.TryGetValue(mod!.Id, out var info) &&
+            info.Error == null &&
+            info.UpdateAvailable;
     }
 
     /// <summary>Texto mostrado na coluna "Atualização" para um mod, a partir do cache em memória.</summary>
     private string FormatUpdateStatus(ModRecord mod)
     {
         if (!_updateCache.TryGetValue(mod.Id, out var info))
-            return "não verificado";
+            return "Não verificado";
         if (info.Error != null)
-            return "não foi possível verificar";
+            return "Falha na verificação";
         if (info.UpdateAvailable)
-            return string.IsNullOrWhiteSpace(info.LatestVersion) ? "nova versão disponível" : $"nova versão: {info.LatestVersion}";
-        return "em dia";
+            return string.IsNullOrWhiteSpace(info.LatestVersion) ? "Atualização disponível" : $"Atualizar para {info.LatestVersion}";
+        return "Em dia";
     }
 
     private void Mods_MouseUp(object? sender, MouseEventArgs e)
@@ -1329,6 +1324,9 @@ public sealed class MainForm : Form
         Log(withUpdate == 0
             ? $"Nenhuma atualização encontrada ({withError} não verificado(s))."
             : $"{withUpdate} mod(s) com atualização disponível ({withError} não verificado(s)).");
+        _status.Text = withUpdate == 0
+            ? "Mods verificados: nenhuma atualização encontrada."
+            : $"{withUpdate} atualização(ões) disponível(is).";
         RefreshMods();
     }
 
@@ -1497,37 +1495,40 @@ public sealed class MainForm : Form
         var root = _gamePath.Text.Trim().Trim('"');
         if (!IsGameRoot(root))
         {
-            SetGameStatus("Jogo não definido", StatusSeverity.Neutral);
+            _gameLocationLabel.Text = "Detecte a instalação para começar.";
+            SetGameStatus("Satisfactory não detectado", StatusSeverity.Neutral);
+            UpdateReadinessStatus();
             return;
         }
+
+        _gameLocationLabel.Text = root;
 
         if (!string.IsNullOrWhiteSpace(_settings.GameExeOverride))
         {
             if (File.Exists(_settings.GameExeOverride))
             {
-                SetGameStatus("Instalação válida. Executável manual: " + _settings.GameExeOverride, StatusSeverity.Success);
+                SetGameStatus("Satisfactory pronto · executável manual", StatusSeverity.Success);
+                UpdateReadinessStatus();
                 return;
             }
 
-            SetGameStatus("Executável manual configurado não existe mais; use \"Auto\" ou selecione outro.", StatusSeverity.Warning);
+            SetGameStatus("Executável manual inválido · revise em Configurações", StatusSeverity.Warning);
+            UpdateReadinessStatus();
             return;
         }
 
         if (_settings.PreferSteamLaunch && LooksLikeSteamInstall(root) && IsSteamAvailable())
         {
-            SetGameStatus("Instalação válida detectada. Inicia via Steam (recomendado).", StatusSeverity.Success);
+            SetGameStatus("Satisfactory pronto · Steam", StatusSeverity.Success);
+            UpdateReadinessStatus();
             return;
         }
 
         var exe = FindGameExe(root);
-        if (exe == null)
-        {
-            SetGameStatus("Pasta encontrada, mas o executável do jogo não foi localizado.", StatusSeverity.Warning);
-        }
-        else
-        {
-            SetGameStatus("Instalação válida detectada. Executável: " + exe, StatusSeverity.Success);
-        }
+        SetGameStatus(
+            exe == null ? "Jogo detectado · executável não localizado" : "Satisfactory pronto",
+            exe == null ? StatusSeverity.Warning : StatusSeverity.Success);
+        UpdateReadinessStatus();
     }
 
     private void SetGameStatus(string text, StatusSeverity severity)
@@ -1539,6 +1540,268 @@ public sealed class MainForm : Form
             StatusSeverity.Warning => _palette.Warning,
             _ => _palette.Muted
         };
+    }
+
+    private void UpdateReadinessStatus()
+    {
+        if (_smlStatusLabel == null || _smlStatusLabel.IsDisposed)
+            return;
+
+        var gameReady = IsGameRoot(_gamePath?.Text?.Trim().Trim('"'));
+        if (!gameReady)
+        {
+            _smlStatusLabel.Text = "SML: aguardando jogo";
+            _smlStatusLabel.ForeColor = _palette.Muted;
+            if (_installSmlButton != null)
+                _installSmlButton.Visible = false;
+            return;
+        }
+
+        var installed = IsSmlInstalled();
+        _smlStatusLabel.Text = installed ? "SML instalado · pronto para mods" : "SML ausente · necessário para mods";
+        _smlStatusLabel.ForeColor = installed ? _palette.Success : _palette.Warning;
+        if (_installSmlButton != null)
+            _installSmlButton.Visible = !installed;
+    }
+
+    private void BrowseMods()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "https://ficsit.app/mods",
+                UseShellExecute = true
+            });
+            _status.Text = "Abrindo catálogo de mods no ficsit.app…";
+        }
+        catch (Exception ex)
+        {
+            Log("Não foi possível abrir o ficsit.app: " + ex.Message);
+            _status.Text = "Não foi possível abrir o ficsit.app.";
+        }
+    }
+
+    private void ToggleActivity()
+    {
+        _activityExpanded = !_activityExpanded;
+        _rootLayout.RowStyles[4].Height = _activityExpanded ? 132 : 0;
+        if (_activityPanel != null)
+            _activityPanel.Visible = _activityExpanded;
+        _rootLayout.PerformLayout();
+    }
+
+    private void ShowLibraryMenu(Control anchor)
+    {
+        var menu = new ContextMenuStrip();
+        menu.Items.Add("Adicionar pasta…", null, (_, _) => AddFolderMod());
+        menu.Items.Add("Verificar todas as atualizações", null, (_, _) => CheckAllModsForUpdates());
+        menu.Items.Add("Atualizar todas as disponíveis", null, async (_, _) => await UpdateAllAvailableModsAsync());
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Abrir pasta de Mods", null, (_, _) => OpenModsFolder());
+        menu.Show(anchor, new Point(0, anchor.Height));
+    }
+
+    private void ShowSettingsDialog()
+    {
+        using var dialog = new Form
+        {
+            Text = "Configurações",
+            Width = 520,
+            Height = 390,
+            MinimumSize = new Size(500, 360),
+            StartPosition = FormStartPosition.CenterParent,
+            Font = Font,
+            BackColor = _palette.BackgroundBase,
+            ForeColor = _palette.Foreground
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 7,
+            Padding = new Padding(18),
+            BackColor = _palette.BackgroundBase
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        dialog.Controls.Add(layout);
+
+        var steam = new CheckBox
+        {
+            Text = "Preferir iniciar via Steam",
+            Checked = _settings.PreferSteamLaunch,
+            AutoSize = true,
+            Anchor = AnchorStyles.Left,
+            ForeColor = _palette.Foreground
+        };
+        steam.CheckedChanged += (_, _) =>
+        {
+            _settings.PreferSteamLaunch = steam.Checked;
+            SaveState();
+            UpdateGameStatus();
+        };
+        layout.Controls.Add(steam);
+
+        var afterInstall = new CheckBox
+        {
+            Text = "Iniciar jogo automaticamente após instalar um mod",
+            Checked = _settings.LaunchAfterInstall,
+            AutoSize = true,
+            Anchor = AnchorStyles.Left,
+            ForeColor = _palette.Foreground
+        };
+        afterInstall.CheckedChanged += (_, _) =>
+        {
+            _settings.LaunchAfterInstall = afterInstall.Checked;
+            SaveState();
+        };
+        layout.Controls.Add(afterInstall);
+
+        var exeRow = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, BackColor = _palette.BackgroundBase };
+        exeRow.Controls.Add(Btn("Selecionar executável…", (_, _) => PickGameExe(), ButtonKind.Secondary));
+        exeRow.Controls.Add(Btn("Usar detecção automática", (_, _) => UseAutoGameExe(), ButtonKind.Secondary));
+        layout.Controls.Add(exeRow);
+
+        var integrationRow = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, BackColor = _palette.BackgroundBase };
+        integrationRow.Controls.Add(Btn("Reparar integração ficsit.app", (_, _) => RegisterFicsitProtocol(), ButtonKind.Secondary));
+        integrationRow.Controls.Add(Btn("Abrir dados do app", (_, _) => OpenDataFolder(), ButtonKind.Secondary));
+        layout.Controls.Add(integrationRow);
+
+        var themeRow = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, BackColor = _palette.BackgroundBase };
+        themeRow.Controls.Add(new Label { Text = "Aparência", AutoSize = true, Margin = new Padding(0, 10, 12, 0), ForeColor = _palette.Foreground });
+        var themeButton = Btn(_settings.DarkMode ? "Usar modo claro" : "Usar modo escuro", (_, _) =>
+        {
+            ToggleTheme();
+            dialog.BackColor = _palette.BackgroundBase;
+            dialog.ForeColor = _palette.Foreground;
+        }, ButtonKind.Secondary);
+        themeRow.Controls.Add(themeButton);
+        layout.Controls.Add(themeRow);
+
+        _installSmlButton = Btn("Instalar SML", async (_, _) => await InstallSmlInteractiveAsync(), ButtonKind.Accent);
+        layout.Controls.Add(_installSmlButton);
+
+        var note = new Label
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = false,
+            Text = $"Versão {AppVersion}\\nConfigurações avançadas ficam aqui para manter a biblioteca focada no uso normal.",
+            ForeColor = _palette.Muted
+        };
+        layout.Controls.Add(note);
+
+        UpdateReadinessStatus();
+        dialog.ShowDialog(this);
+        _installSmlButton = new Button();
+    }
+
+    private async Task InstallSmlInteractiveAsync()
+    {
+        if (!EnsureGameRoot())
+            return;
+        if (IsSmlInstalled())
+        {
+            _status.Text = "SML já está instalado.";
+            UpdateReadinessStatus();
+            return;
+        }
+
+        _progress.Visible = true;
+        _status.Text = "Baixando e instalando SML do ficsit.app…";
+        try
+        {
+            var downloaded = await FicsitApiClient.DownloadModAsync(SmlModId, string.Empty, _dataRoot);
+            InstallPath(downloaded.FilePath);
+            try { File.Delete(downloaded.FilePath); } catch { }
+            SaveState();
+            RefreshMods();
+            _status.Text = $"SML {downloaded.Version} instalado. Pronto para iniciar com mods.";
+        }
+        catch (Exception ex)
+        {
+            Log("Falha ao instalar SML: " + ex.Message);
+            _status.Text = "Não foi possível instalar o SML. Consulte Atividade.";
+        }
+        finally
+        {
+            _progress.Visible = false;
+            UpdateReadinessStatus();
+        }
+    }
+
+    private async Task UpdateSelectedModAsync()
+    {
+        var mod = SelectedMod();
+        if (mod == null)
+            return;
+
+        if (!_updateCache.TryGetValue(mod.Id, out var info) || info.Error != null || !info.UpdateAvailable)
+        {
+            await CheckModUpdateAsync(mod, announceUpToDate: true);
+            if (!_updateCache.TryGetValue(mod.Id, out info) || info.Error != null || !info.UpdateAvailable)
+            {
+                RefreshMods();
+                return;
+            }
+        }
+
+        await UpdateModAsync(mod, info);
+    }
+
+    private async Task UpdateModAsync(ModRecord mod, FicsitApiClient.ModUpdateInfo info)
+    {
+        if (!EnsureGameRoot())
+            return;
+
+        _progress.Visible = true;
+        _status.Text = $"Atualizando {mod.Name}…";
+        try
+        {
+            var requestedVersion = info.LatestVersion ?? string.Empty;
+            var downloaded = await FicsitApiClient.DownloadModAsync(mod.Id, requestedVersion, _dataRoot);
+            InstallPath(downloaded.FilePath);
+            try { File.Delete(downloaded.FilePath); } catch { }
+            _updateCache.Remove(mod.Id);
+            SaveState();
+            RefreshMods();
+            _status.Text = $"{downloaded.Name} atualizado para {downloaded.Version}.";
+            Log($"Atualizado: {downloaded.Name} {downloaded.Version}");
+        }
+        catch (Exception ex)
+        {
+            Log($"Falha ao atualizar '{mod.Name}': {ex.Message}");
+            _status.Text = $"Falha ao atualizar {mod.Name}. Consulte Atividade.";
+        }
+        finally
+        {
+            _progress.Visible = false;
+        }
+    }
+
+    private async Task UpdateAllAvailableModsAsync()
+    {
+        var candidates = _db.Mods
+            .Where(m => _updateCache.TryGetValue(m.Id, out var info) && info.Error == null && info.UpdateAvailable)
+            .Select(m => (Mod: m, Info: _updateCache[m.Id]))
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            _status.Text = "Nenhuma atualização conhecida. Verifique as atualizações primeiro.";
+            return;
+        }
+
+        foreach (var candidate in candidates)
+            await UpdateModAsync(candidate.Mod, candidate.Info);
+
+        _status.Text = "Atualizações disponíveis processadas.";
     }
 
     private void AutoDetectGame(bool showFailure)
@@ -2270,7 +2533,17 @@ public sealed class MainForm : Form
         if (!EnsureGameRoot())
             return;
 
-        await EnsureSmlInstalledAsync();
+        if (!IsSmlInstalled())
+        {
+            _status.Text = "SML necessário antes de iniciar com mods.";
+            MessageBox.Show(this,
+                "O Satisfactory Mod Loader (SML) ainda não está instalado.\n\nInstale o SML explicitamente antes de iniciar o jogo com mods. Use Configurações > Instalar SML.",
+                "SML necessário",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+            UpdateReadinessStatus();
+            return;
+        }
 
         var root = _settings.GameRoot!;
 
