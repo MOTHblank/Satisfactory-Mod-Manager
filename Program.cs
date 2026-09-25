@@ -237,6 +237,7 @@ public sealed class MainForm : Form
     private ComboBox _filterBox = new ComboBox();
     private Button _updateButton = new Button();
     private Button _installSmlButton = new Button();
+    private Button _headerInstallSmlButton = new Button();
     private FlowLayoutPanel _selectedActionsPanel = new FlowLayoutPanel();
     private TableLayoutPanel _rootLayout = new TableLayoutPanel();
     private Control? _activityPanel;
@@ -365,13 +366,15 @@ public sealed class MainForm : Form
         var readiness = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 1,
+            ColumnCount = 2,
             RowCount = 3,
             Margin = new Padding(12, 0, 12, 0)
         };
+        readiness.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        readiness.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112));
         readiness.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         readiness.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
-        readiness.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
+        readiness.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
 
         _gameStatus = new Label
         {
@@ -400,6 +403,14 @@ public sealed class MainForm : Form
             TextAlign = ContentAlignment.MiddleLeft
         };
         readiness.Controls.Add(_smlStatusLabel, 0, 2);
+
+        _headerInstallSmlButton = Btn("Instalar SML", async (_, _) => await InstallSmlInteractiveAsync(), ButtonKind.Accent);
+        _headerInstallSmlButton.Dock = DockStyle.Fill;
+        _headerInstallSmlButton.AutoSize = false;
+        _headerInstallSmlButton.Margin = new Padding(6, 2, 0, 2);
+        _headerInstallSmlButton.Visible = false;
+        readiness.Controls.Add(_headerInstallSmlButton, 1, 2);
+
         headerLayout.Controls.Add(readiness, 1, 0);
 
         var headerActions = new TableLayoutPanel
@@ -1229,6 +1240,8 @@ public sealed class MainForm : Form
         var mod = SelectedMod();
         var hasSelection = mod != null;
         _selectedActionsPanel.Visible = hasSelection;
+        if (_rootLayout.RowStyles.Count > 3)
+            _rootLayout.RowStyles[3].Height = hasSelection ? 44 : 0;
         _enableButton.Visible = hasSelection && !mod!.Enabled;
         _disableButton.Visible = hasSelection && mod!.Enabled;
         _removeButton.Visible = hasSelection;
@@ -1554,6 +1567,8 @@ public sealed class MainForm : Form
             _smlStatusLabel.ForeColor = _palette.Muted;
             if (_installSmlButton != null)
                 _installSmlButton.Visible = false;
+            if (_headerInstallSmlButton != null)
+                _headerInstallSmlButton.Visible = false;
             return;
         }
 
@@ -1562,6 +1577,8 @@ public sealed class MainForm : Form
         _smlStatusLabel.ForeColor = installed ? _palette.Success : _palette.Warning;
         if (_installSmlButton != null)
             _installSmlButton.Visible = !installed;
+        if (_headerInstallSmlButton != null)
+            _headerInstallSmlButton.Visible = !installed;
     }
 
     private void BrowseMods()
@@ -2450,8 +2467,8 @@ public sealed class MainForm : Form
 
         var answer = MessageBox.Show(
             this,
-            $"Remover '{mod.Name}' do gerenciador e do jogo?\n\nArquivos originais sobrescritos pelo mod terão seus backups restaurados quando disponíveis.",
-            "Confirmar remoção",
+            $"Desinstalar '{mod.Name}'?\n\nOs arquivos instalados pelo mod serão removidos. Arquivos originais sobrescritos serão restaurados a partir dos backups quando disponíveis.",
+            "Confirmar desinstalação",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Question);
 
@@ -2533,11 +2550,16 @@ public sealed class MainForm : Form
         if (!EnsureGameRoot())
             return;
 
-        if (!IsSmlInstalled())
+        var hasEnabledMods = _db.Mods.Any(m =>
+            m.Enabled &&
+            !m.Name.Equals("SML", StringComparison.OrdinalIgnoreCase) &&
+            !m.Name.Contains("Mod Loader", StringComparison.OrdinalIgnoreCase));
+
+        if (hasEnabledMods && !IsSmlInstalled())
         {
             _status.Text = "SML necessário antes de iniciar com mods.";
             MessageBox.Show(this,
-                "O Satisfactory Mod Loader (SML) ainda não está instalado.\n\nInstale o SML explicitamente antes de iniciar o jogo com mods. Use Configurações > Instalar SML.",
+                "Há mods ativos, mas o Satisfactory Mod Loader (SML) ainda não está instalado.\n\nUse “Instalar SML” no cabeçalho. O gerenciador não instalará componentes silenciosamente ao pressionar Jogar.",
                 "SML necessário",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
@@ -2600,38 +2622,6 @@ public sealed class MainForm : Form
         }
 
         StartProcess(exe, "Jogo iniciado: " + exe);
-    }
-
-    /// <summary>
-    /// Garante que o SML (Satisfactory Mod Loader) esteja instalado antes de iniciar o jogo.
-    /// Sem ele, todo mod uPlugin falha ao carregar com "missing dependency on the 'SML' plugin".
-    /// Baixa e instala automaticamente pelo ficsit.app quando ausente.
-    /// </summary>
-    private async Task EnsureSmlInstalledAsync()
-    {
-        if (IsSmlInstalled())
-            return;
-
-        Log("SML (Satisfactory Mod Loader) não encontrado; baixando automaticamente do ficsit.app...");
-        _progress.Visible = true;
-        try
-        {
-            var downloaded = await FicsitApiClient.DownloadModAsync(SmlModId, string.Empty, _dataRoot);
-            InstallPath(downloaded.FilePath);
-            RefreshMods();
-            SaveState();
-            Log($"SML instalado automaticamente: versão {downloaded.Version}.");
-        }
-        catch (Exception ex)
-        {
-            Log("Não foi possível instalar o SML automaticamente (" + ex.Message + "). " +
-                "Baixe manualmente em ficsit.app/mod/SML e arraste o pacote para esta janela, " +
-                "ou os mods continuarão mostrando \"missing dependency on the 'SML' plugin\".");
-        }
-        finally
-        {
-            _progress.Visible = false;
-        }
     }
 
     private bool IsSmlInstalled()
