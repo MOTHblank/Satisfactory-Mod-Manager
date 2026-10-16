@@ -1,9 +1,8 @@
 name: Build
 
+# Routine checks run manually to conserve runner minutes.
 on:
-  push:
-    branches: [ main ]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
